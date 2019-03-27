@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLSocket;
 import okhttp3.RecordingEventListener.CallEnd;
 import okhttp3.RecordingEventListener.CallFailed;
 import okhttp3.RecordingEventListener.ConnectEnd;
@@ -950,9 +951,11 @@ public final class EventListenerTest {
   }
 
   @Test public void requestBodyFailHttp2OverHttps() throws IOException {
+    long start = System.currentTimeMillis();
     enableTlsWithTunnel(false);
     server.setProtocols(asList(Protocol.HTTP_2, Protocol.HTTP_1_1));
     requestBodyFail();
+    System.out.println("XXX took " + (System.currentTimeMillis() - start));
   }
 
   @Test public void requestBodyFailHttp() throws IOException {
@@ -960,6 +963,17 @@ public final class EventListenerTest {
   }
 
   private void requestBodyFail() {
+    client = client.newBuilder()
+        .sslSocketFactory(new DelegatingSSLSocketFactory(client.sslSocketFactory()) {
+          @Override protected SSLSocket configureSocket(SSLSocket sslSocket) throws IOException {
+            SSLSocket socket = super.configureSocket(sslSocket);
+            System.out.println("XXX original nodelay=" + socket.getTcpNoDelay());
+            socket.setTcpNoDelay(true);
+            return socket;
+          }
+        }, handshakeCertificates.trustManager())
+        .build();
+
     // Stream a 256 MiB body so the disconnect will happen before the server has read everything.
     RequestBody requestBody = new RequestBody() {
       @Override public MediaType contentType() {
