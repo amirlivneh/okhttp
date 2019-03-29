@@ -963,17 +963,6 @@ public final class EventListenerTest {
   }
 
   private void requestBodyFail() {
-    client = client.newBuilder()
-        .sslSocketFactory(new DelegatingSSLSocketFactory(client.sslSocketFactory()) {
-          @Override protected SSLSocket configureSocket(SSLSocket sslSocket) throws IOException {
-            SSLSocket socket = super.configureSocket(sslSocket);
-            System.out.println("XXX original nodelay=" + socket.getTcpNoDelay());
-            socket.setTcpNoDelay(true);
-            return socket;
-          }
-        }, handshakeCertificates.trustManager())
-        .build();
-
     // Stream a 256 MiB body so the disconnect will happen before the server has read everything.
     RequestBody requestBody = new RequestBody() {
       @Override public MediaType contentType() {
@@ -1133,7 +1122,13 @@ public final class EventListenerTest {
             handshakeCertificates.sslSocketFactory(), handshakeCertificates.trustManager())
         .hostnameVerifier(new RecordingHostnameVerifier())
         .build();
-    server.useHttps(handshakeCertificates.sslSocketFactory(), tunnelProxy);
+    server.useHttps(new DelegatingSSLSocketFactory(handshakeCertificates.sslSocketFactory()) {
+      @Override protected SSLSocket configureSocket(SSLSocket sslSocket) throws IOException {
+        SSLSocket socket = super.configureSocket(sslSocket);
+        socket.setTcpNoDelay(true);
+        return socket;
+      }
+    }, tunnelProxy);
   }
 
   @Test public void redirectUsingSameConnectionEventSequence() throws IOException {
