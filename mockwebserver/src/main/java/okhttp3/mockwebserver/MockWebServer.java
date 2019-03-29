@@ -507,6 +507,8 @@ public final class MockWebServer extends ExternalResource implements Closeable {
           socket = raw;
         }
 
+        socket.setTcpNoDelay(true);
+
         if (socketPolicy == STALL_SOCKET_AT_START) {
           return; // Ignore the socket until the server is shut down!
         }
